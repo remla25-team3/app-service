@@ -28,7 +28,7 @@ def get_prediction():
 		400:
 			description: Input is not a JSON object with "review" as key.
 		500:
-			description: Prediction could not be fetched.
+			description: Prediction could not be fetched from `model-service`.
 	"""
 	try:
 		msg = request.get_json()
@@ -48,6 +48,41 @@ def get_prediction():
 		return model_service_response.text
 
 	return 'Could not fetch prediction', 500
+
+
+@app.route('/update-prediction', methods=['POST'])
+def update_prediction():
+	"""
+	Updates or confirms a prediction.
+	This request is forwarded to `model-service` for processing.
+	---
+	parameters:
+	  - name: input
+	    in: body
+	    description: JSON with "review" and "label" keys.
+	    required: true
+	responses:
+		200:
+			description: Request was OK.
+		400:
+			description: Input is not in a correct format.
+		500:
+			description: Could not connect to `model-service`.
+	"""
+	try:
+		msg = request.get_json()
+	except Exception:
+		return 'Payload should be a JSON object with "review" and "label" as keys', 400
+
+	if not 'review' in msg:
+		return 'JSON payload should contain "review" key', 400
+	if not 'label' in msg:
+		return 'JSON payload should contain "label" key', 400
+
+	# Here, we would want to send a request to model-service,
+	# but for testing purposes we don't.
+	# req_url = f'http://{model_service_url}:{model_service_port}/update-prediction'
+	return f'Review label was successfully updated to {msg['label']}'
 
 
 @app.route("/version", methods=["GET"])
