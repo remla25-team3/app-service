@@ -102,4 +102,4 @@ def get_lib_version():
 		print(e)
 		return "Version not found", 500
 
-app.run(host="0.0.0.0", port=8080)
+app.run(host="0.0.0.0", port=5000)
