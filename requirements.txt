@@ -1,0 +1,7 @@
+Flask==2.3.3
+flasgger==0.9.7.1
+requests==2.32.3
+
+libversion @ git+https://github.com/remla25-team3/lib-version@v1.0.0    # Should be changed to @main or @latest once lib-version is updated
+
+.   # Import packages inside this project
