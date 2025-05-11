@@ -1,0 +1,39 @@
+on:
+  workflow_dispatch:
+    inputs:
+      init-ver:
+        description: 'Initial version'
+        required: true
+        default: '1.0.0'
+      release-type:
+        description: 'Release type'
+        required: true
+        default: 'simple'
+
+name: release-please 🥾 strap
+
+jobs:
+  release-please-bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ vars.TEAM_APP_ID }}
+          private-key: ${{ secrets.TEAM_APP_KEY }}
+
+      - name: install release please cli
+        run: npm i release-please
+
+      - name: release please boostrap
+        run: >
+          npx
+          release-please
+          bootstrap
+          --token=${{ steps.app-token.outputs.token }}
+          --repo-url=${{ github.repository }}
+          --release-type=${{ inputs.release-type }}
+          --initial-version=${{ inputs.init-ver }}
