@@ -107,6 +107,15 @@ def get_lib_version():
 
 @app.route("/metrics", methods=["GET"])
 def metrics():
+	"""
+	Endpoint for metrics inspectable in Prometheus.
+	---
+	responses:
+		200:
+			description: >
+				Plain text in Prometheus-friendly format.
+				Metrics: num_predictions_fetched (counter), times_prediction_updated (counter).
+	"""
 	global num_predictions_fetched, times_prediction_updated
 
 	m  = '# HELP num_predictions_fetched Number of predictions fetched from `model-service`.\n'
@@ -117,6 +126,6 @@ def metrics():
 	m += '# TYPE times_prediction_updated counter\n'
 	m += f'times_prediction_updated = {str(times_prediction_updated)}\n\n'
 
-	return Response('', mimetype='text/plain')
+	return Response(m, mimetype='text/plain')
 
 app.run(host="0.0.0.0", port=5000)
