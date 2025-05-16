@@ -1,6 +1,6 @@
 import os
 import requests
-from flask import Flask, request
+from flask import Flask, request, Response
 from flasgger import Swagger
 from libversion.version_util import VersionUtil
 
@@ -10,6 +10,11 @@ swagger = Swagger(app)
 # Fetch URL/port to model-service from environment variables (service name from docker-compose)
 model_service_url = os.getenv('MODEL_SERVICE_URL', default='model-service')
 model_service_port = os.getenv('MODEL_SERVICE_PORT', default='8081')
+
+
+## Metrics
+num_predictions_fetched = 0		# Total number of predictions fetched by user
+times_prediction_updated = 0	# Number of times the user updated a prediction
 
 
 @app.route('/get-prediction', methods=['POST'])
@@ -79,9 +84,6 @@ def update_prediction():
 	if not 'label' in msg:
 		return 'JSON payload should contain "label" key', 400
 
-	# Here, we would want to send a request to model-service,
-	# but for testing purposes we don't.
-	# req_url = f'http://{model_service_url}:{model_service_port}/update-prediction'
 	return f'Review label was successfully updated to {msg['label']}'
 
 
@@ -101,5 +103,20 @@ def get_lib_version():
 	except Exception as e:
 		print(e)
 		return "Version not found", 500
+
+
+@app.route("/metrics", methods=["GET"])
+def metrics():
+	global num_predictions_fetched, times_prediction_updated
+
+	m  = '# HELP num_predictions_fetched Number of predictions fetched from `model-service`.\n'
+	m += '# TYPE num_predictions_fetched counter\n'
+	m += f'num_predictions_fetched = {str(num_predictions_fetched)}\n\n'
+
+	m += '# HELP times_prediction_updated Number of times the user updated a prediction from `model-service`.\n'
+	m += '# TYPE times_prediction_updated counter\n'
+	m += f'times_prediction_updated = {str(times_prediction_updated)}\n\n'
+
+	return Response('', mimetype='text/plain')
 
 app.run(host="0.0.0.0", port=5000)
