@@ -15,8 +15,6 @@ model_service_port = os.getenv('MODEL_SERVICE_PORT', default='8081')
 
 
 ## Metrics
-num_predictions_fetched = 0		# Total number of predictions fetched by user
-times_prediction_updated = 0	# Number of times the user updated a prediction
 
 # General info
 metrics.info('app_info', 'Application info', version=VersionUtil.get_version())
@@ -30,6 +28,7 @@ prediction_count_by_type = metrics.counter(
 	'prediction_count_by_type', 'Number of predictions by type',
 	labels={'prediction': lambda response: response.text}
 )
+
 
 @app.route('/get-prediction', methods=['POST'])
 def get_prediction():
@@ -124,28 +123,5 @@ def get_lib_version():
 		print(e)
 		return "Version not found", 500
 
-
-@app.route("/metrics", methods=["GET"])
-def metrics():
-	"""
-	Endpoint for metrics inspectable in Prometheus.
-	---
-	responses:
-		200:
-			description: >
-				Plain text in Prometheus-friendly format.
-				Metrics: num_predictions_fetched (counter), times_prediction_updated (counter).
-	"""
-	global num_predictions_fetched, times_prediction_updated
-
-	m  = '# HELP num_predictions_fetched Number of predictions fetched from `model-service`.\n'
-	m += '# TYPE num_predictions_fetched counter\n'
-	m += f'num_predictions_fetched = {str(num_predictions_fetched)}\n\n'
-
-	m += '# HELP times_prediction_updated Number of times the user updated a prediction from `model-service`.\n'
-	m += '# TYPE times_prediction_updated counter\n'
-	m += f'times_prediction_updated = {str(times_prediction_updated)}\n\n'
-
-	return Response(m, mimetype='text/plain')
 
 app.run(host="0.0.0.0", port=5000)
