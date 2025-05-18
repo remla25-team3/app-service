@@ -29,6 +29,10 @@ prediction_count_by_type = metrics.counter(
 	labels={'prediction': lambda response: response.text}
 )
 
+active_prediction_requests = metrics.gauge(
+	'active_prediction_requests', 'Number of requests being processed at a time'
+)
+
 
 @app.route('/get-prediction', methods=['POST'])
 def get_prediction():
@@ -48,30 +52,37 @@ def get_prediction():
 		500:
 			description: Prediction could not be fetched from `model-service`.
 	"""
+	# Keep track of currently active requests
+	active_prediction_requests.inc()
+
 	try:
-		msg = request.get_json()
-	except Exception:
-		return 'Payload should be a JSON object with "review" as key', 400
+		try:
+			msg = request.get_json()
+		except Exception:
+			return 'Payload should be a JSON object with "review" as key', 400
 
-	if not 'review' in msg:
-		return 'JSON payload should contain "review" key', 400
+		if not 'review' in msg:
+			return 'JSON payload should contain "review" key', 400
 
-	req_url = f'http://{model_service_url}:{model_service_port}/predict'
-	try:
-		model_service_response = requests.post(req_url, json=msg)
-	except Exception:
-		return f'Could not connect to model-service', 500
+		req_url = f'http://{model_service_url}:{model_service_port}/predict'
+		try:
+			model_service_response = requests.post(req_url, json=msg)
+		except Exception:
+			return f'Could not connect to model-service', 500
 
-	if model_service_response.ok:
-		# If we got a response from `model-service`, feed the input's length to the metrics
-		review_input_length.observe(len(msg['review']))
+		if model_service_response.ok:
+			# If we got a response from `model-service`, feed the input's length to the metrics
+			review_input_length.observe(len(msg['review']))
 
-		# Also increment prediction count by type
-		prediction_count_by_type.inc()
+			# Also increment prediction count by type
+			prediction_count_by_type.inc()
 
-		return model_service_response.text
+			return model_service_response.text
 
-	return 'Could not fetch prediction', 500
+		return 'Could not fetch prediction', 500
+	finally:
+		# Request was finished; decrease number of active requests
+		active_prediction_requests.dec()
 
 
 @app.route('/update-prediction', methods=['POST'])
