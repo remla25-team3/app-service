@@ -64,10 +64,10 @@ def get_prediction():
 
 	if model_service_response.ok:
 		# If we got a response from `model-service`, feed the input's length to the metrics
-		review_input_length.labels(prediction=model_service_response.text).observe(len(msg['review']))
+		review_input_length.observe(len(msg['review']))
 
 		# Also increment prediction count by type
-		prediction_count_by_type.labels(prediction=model_service_response.text).inc()
+		prediction_count_by_type.inc()
 
 		return model_service_response.text
 
