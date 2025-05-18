@@ -1,11 +1,13 @@
 import os
 import requests
 from flask import Flask, request, Response
+from prometheus_flask_exporter import PrometheusMetrics
 from flasgger import Swagger
 from libversion.version_util import VersionUtil
 
 app = Flask(__name__)
 swagger = Swagger(app)
+metrics = PrometheusMetrics(app)
 
 # Fetch URL/port to model-service from environment variables (service name from docker-compose)
 model_service_url = os.getenv('MODEL_SERVICE_URL', default='model-service')
@@ -16,6 +18,18 @@ model_service_port = os.getenv('MODEL_SERVICE_PORT', default='8081')
 num_predictions_fetched = 0		# Total number of predictions fetched by user
 times_prediction_updated = 0	# Number of times the user updated a prediction
 
+# General info
+metrics.info('app_info', 'Application info', version=VersionUtil.get_version())
+
+review_input_length = metrics.histogram(
+	'input_length_vs_prediction', 'Histogram of review input lengths verus predictions',
+	labels={'prediction': lambda response: response.text}
+)
+
+prediction_count_by_type = metrics.counter(
+	'prediction_count_by_type', 'Number of predictions by type',
+	labels={'prediction': lambda response: response.text}
+)
 
 @app.route('/get-prediction', methods=['POST'])
 def get_prediction():
@@ -50,6 +64,12 @@ def get_prediction():
 		return f'Could not connect to model-service', 500
 
 	if model_service_response.ok:
+		# If we got a response from `model-service`, feed the input's length to the metrics
+		review_input_length.labels(prediction=model_service_response.text).observe(len(msg['review']))
+
+		# Also increment prediction count by type
+		prediction_count_by_type.labels(prediction=model_service_response.text).inc()
+
 		return model_service_response.text
 
 	return 'Could not fetch prediction', 500
