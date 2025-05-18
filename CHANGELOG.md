@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/remla25-team3/app-service/compare/v1.1.0...v1.2.0) (2025-05-18)
+
+
+### Features
+
+* enable multiarchitecture builds ([#7](https://github.com/remla25-team3/app-service/issues/7)) ([9e59163](https://github.com/remla25-team3/app-service/commit/9e59163496f368fdbeadb4daead7439cc1633da5))
+
 ## [1.1.0](https://github.com/remla25-team3/app-service/compare/v1.0.0...v1.1.0) (2025-05-11)
 
 
