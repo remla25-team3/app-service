@@ -3,7 +3,7 @@ import requests
 from flask import Flask, request, Response
 from prometheus_flask_exporter import PrometheusMetrics
 from flasgger import Swagger
-from libversion.version_util import VersionUtil
+from libversion import version_util
 
 app = Flask(__name__)
 swagger = Swagger(app)
@@ -17,7 +17,7 @@ model_service_port = os.getenv('MODEL_SERVICE_PORT', default='8081')
 ## Metrics
 
 # General info
-metrics.info('app_info', 'Application info', version=VersionUtil.get_version())
+metrics.info('app_info', 'Application info', version=version_util.VersionUtil.get_version())
 
 review_input_length = metrics.histogram(
 	'input_length_vs_prediction', 'Histogram of review input lengths verus predictions',
@@ -53,7 +53,7 @@ def get_prediction():
 			description: Prediction could not be fetched from `model-service`.
 	"""
 	# Keep track of currently active requests
-	active_prediction_requests.inc()
+	# active_prediction_requests.inc()
 
 	try:
 		try:
@@ -75,14 +75,15 @@ def get_prediction():
 			review_input_length.observe(len(msg['review']))
 
 			# Also increment prediction count by type
-			prediction_count_by_type.inc()
+			# prediction_count_by_type.inc()
 
 			return model_service_response.text
 
 		return 'Could not fetch prediction', 500
 	finally:
 		# Request was finished; decrease number of active requests
-		active_prediction_requests.dec()
+		# active_prediction_requests.dec()
+		pass
 
 
 @app.route('/update-prediction', methods=['POST'])
@@ -129,7 +130,7 @@ def get_lib_version():
 			description: Version could not be retrieved.
 	"""
 	try:
-		return VersionUtil.get_version()
+		return version_util.VersionUtil.get_version()
 	except Exception as e:
 		print(e)
 		return "Version not found", 500
