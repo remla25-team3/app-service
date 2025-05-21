@@ -1,7 +1,8 @@
 Flask==2.3.3
 flasgger==0.9.7.1
 requests==2.32.3
+prometheus-flask-exporter==0.23.2
 
-libversion @ git+https://github.com/remla25-team3/lib-version@v1.0.0    # Should be changed to @main or @latest once lib-version is updated
+libversion @ git+https://github.com/remla25-team3/lib-version@main
 
 .   # Import packages inside this project
