@@ -16,10 +16,6 @@ model_service_port = os.getenv('MODEL_SERVICE_PORT', default='8081')
 
 ## Metrics
 
-#global counter for satisfaction
-happyUser = 0
-sadUser = 0
-
 # General info
 metrics.info('app_info', 'Application info', version=version_util.VersionUtil.get_version())
 
@@ -36,6 +32,15 @@ prediction_count_by_type = metrics.counter(
 active_prediction_requests = metrics.gauge(
 	'active_prediction_requests', 'Number of requests being processed at a time'
 )
+
+#user satisfaction
+happy_users_counter = metrics.counter(
+	'happy_users', 'Number of happy users'
+)
+sad_users_counter = metrics.counter(
+	'unsatisfied_users', 'Number of unsatisfied users'
+)
+
 
 @app.route('/get-prediction', methods=['POST'])
 def get_prediction():
@@ -167,11 +172,9 @@ def update_feedback():
 
 	feedback = msg['satisfied']
 	if feedback:
-		global happyUser
-		happyUser += 1
+		happy_users_counter.inc()
 	elif not feedback:
-		global sadUser
-		sadUser += 1
+		sad_users_counter.inc()
 
 	return 'feedback succesfully processed'
 
