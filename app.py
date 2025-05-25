@@ -16,6 +16,10 @@ model_service_port = os.getenv('MODEL_SERVICE_PORT', default='8081')
 
 ## Metrics
 
+#global counter for satisfaction
+happyUser = 0
+sadUser = 0
+
 # General info
 metrics.info('app_info', 'Application info', version=version_util.VersionUtil.get_version())
 
@@ -32,7 +36,6 @@ prediction_count_by_type = metrics.counter(
 active_prediction_requests = metrics.gauge(
 	'active_prediction_requests', 'Number of requests being processed at a time'
 )
-
 
 @app.route('/get-prediction', methods=['POST'])
 def get_prediction():
@@ -134,6 +137,43 @@ def get_lib_version():
 	except Exception as e:
 		print(e)
 		return "Version not found", 500
+
+@app.route('/update-feedback', methods=['GET'])
+def update_feedback():
+	"""
+	Upon clicking the yes/no button, the yes and no counter
+	should update to reflect user experience
+	---
+	parameters:
+	  - name: input
+	    in: body
+	    description: JSON with 'satisfied' key and true or false as value.
+	    required: true
+	responses:
+		200:
+			description: Sent satisfaction (True="happy" or False="unhappy").
+		400:
+			description: Input is not a JSON object with "satisfied" as key.
+		500:
+			bad request
+	"""
+	try:
+		msg = request.get_json()
+	except Exception:
+		return 'Payload is not a JSON object with "satisfied" as key.', 400
+
+	if not 'satisfied' in msg:
+		return 'JSON payload should contain "satisfied" key', 400
+
+	feedback = msg['satisfied']
+	if feedback:
+		global happyUser
+		happyUser += 1
+	elif not feedback:
+		global sadUser
+		sadUser += 1
+
+	return 'feedback succesfully processed'
 
 
 app.run(host="0.0.0.0", port=5000)
