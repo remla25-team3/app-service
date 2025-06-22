@@ -1,3 +1,6 @@
 .idea/
 .pytest_cache/
 **/__pycache__/
+.venv
+build
+app_service.egg-info

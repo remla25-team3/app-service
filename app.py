@@ -1,139 +1,223 @@
 import os
+import time
+import json
 import requests
-from flask import Flask, request, Response
+from flask import Flask, request, jsonify, make_response
 from prometheus_flask_exporter import PrometheusMetrics
-from flasgger import Swagger
+from flasgger import Swagger, swag_from
 from libversion import version_util
+from flask_cors import CORS
+from prometheus_client import Gauge
 
+# Application setup
 app = Flask(__name__)
-swagger = Swagger(app)
+CORS(app)
+
+# Environment variables
+model_service_host = os.getenv('MODEL_SERVICE_URL', 'model-service')
+model_service_port = int(os.getenv('MODEL_SERVICE_PORT', 5000))
+MODEL_SERVICE_URL = f"http://{model_service_host}:{model_service_port}"
+
+
+# Helper function to get the sentiment from the model-service's JSON response
+def get_sentiment_from_response(response):
+    try:
+        # The response from model-service is JSON
+        return response.json.get("sentiment", "unknown")
+    except (ValueError, AttributeError):
+        # In case of non-JSON response or other errors
+        return "error"
+    
+def get_current_app_version():
+    """Reads the app version from the .release-please-manifest.json file."""
+    try:
+        with open('.release-please-manifest.json', 'r') as f:
+            manifest = json.load(f)
+            # The version is stored with the key "."
+            return manifest.get('.', 'unknown')
+    except (FileNotFoundError, json.JSONDecodeError, KeyError):
+        #file is missing, not valid JSON, or the key is absent
+        return "unknown"
+    
+# Metrics Configuration
 metrics = PrometheusMetrics(app)
-
-# Fetch URL/port to model-service from environment variables (service name from docker-compose)
-model_service_url = os.getenv('MODEL_SERVICE_URL', default='model-service')
-model_service_port = os.getenv('MODEL_SERVICE_PORT', default='8081')
-
-
-## Metrics
-
-# General info
 metrics.info('app_info', 'Application info', version=version_util.VersionUtil.get_version())
 
-review_input_length = metrics.histogram(
-	'input_length_vs_prediction', 'Histogram of review input lengths verus predictions',
-	labels={'prediction': lambda response: response.text}
+# Usability Histogram: Distribution of review lengths
+review_length_histogram = metrics.histogram(
+    'review_length_characters', 'Distribution of the number of characters in reviews',
+    labels={'sentiment': lambda r: get_sentiment_from_response(r)}
+)
+# Usability Counter: User feedback on prediction accuracy
+prediction_feedback_counter = metrics.counter(
+    'prediction_feedback_total', 'Counts of user feedback on predictions',
+    labels={'model_prediction': lambda: request.json.get('model_sentiment'),
+            'user_feedback': lambda: request.json.get('user_sentiment')}
+)
+# Usability Gauge: Timestamp of the last user feedback
+last_feedback_timestamp = Gauge(
+    'last_feedback_timestamp_seconds', 'The timestamp of the last user feedback submission'
 )
 
-prediction_count_by_type = metrics.counter(
-	'prediction_count_by_type', 'Number of predictions by type',
-	labels={'prediction': lambda response: response.text}
-)
+# Swagger API Documentation
+swagger_template = {
+    "swagger": "2.0",
+    "info": {
+        "title": "App Service API",
+        "description": "A service that acts as a proxy to the model-service for sentiment analysis of restaurant reviews.",
+        "version": version_util.VersionUtil.get_version()
+    }
+}
+swagger = Swagger(app, template=swagger_template)
 
-active_prediction_requests = metrics.gauge(
-	'active_prediction_requests', 'Number of requests being processed at a time'
-)
 
+# API Endpoints
+@app.route('/predict', methods=['POST'])
+@review_length_histogram 
+@swag_from({
+    'parameters': [
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'id': 'review_input',
+                'type': 'object',
+                'properties': {
+                    'review': {
+                        'type': 'string',
+                        'example': 'This place is amazing!'
+                    }
+                },
+                'required': ['review']
+            }
+        }
+    ],
+    'responses': {
+        200: {
+            'description': 'Prediction result from the model-service.',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'sentiment': {'type': 'string'},
+                    'confidence_score': {'type': 'number'},
+                    'review': {'type': 'string'}
+                }
+            }
+        },
+        400: {'description': 'Invalid input, "review" key is missing.'},
+        500: {'description': 'Error connecting to the model service or internal error.'}
+    }
+})
+def predict():
+    """
+    Fetches the predicted sentiment of a restaurant review from `model-service`.
+    """
+    try:
+        json_data = request.get_json()
+        if not json_data or 'review' not in json_data:
+            return jsonify({"error": "The 'review' key is missing from the request body."}), 400
 
-@app.route('/get-prediction', methods=['POST'])
-def get_prediction():
-	"""
-	Fetches the predicted sentiment of a restaurant review from `model-service`.
-	---
-	parameters:
-	  - name: input
-	    in: body
-	    description: JSON with 'review' key and the user review as value.
-	    required: true
-	responses:
-		200:
-			description: Prediction result ("positive" or "negative").
-		400:
-			description: Input is not a JSON object with "review" as key.
-		500:
-			description: Prediction could not be fetched from `model-service`.
-	"""
-	# Keep track of currently active requests
-	# active_prediction_requests.inc()
+        response = requests.post(f"{MODEL_SERVICE_URL}/predict", json=json_data, timeout=5)
+        response.raise_for_status()
 
-	try:
-		try:
-			msg = request.get_json()
-		except Exception:
-			return 'Payload should be a JSON object with "review" as key', 400
+        flask_response = make_response(jsonify(response.json()), response.status_code)
 
-		if not 'review' in msg:
-			return 'JSON payload should contain "review" key', 400
-
-		req_url = f'http://{model_service_url}:{model_service_port}/predict'
-		try:
-			model_service_response = requests.post(req_url, json=msg)
-		except Exception:
-			return f'Could not connect to model-service', 500
-
-		if model_service_response.ok:
-			# If we got a response from `model-service`, feed the input's length to the metrics
-			review_input_length.observe(len(msg['review']))
-
-			# Also increment prediction count by type
-			# prediction_count_by_type.inc()
-
-			return model_service_response.text
-
-		return 'Could not fetch prediction', 500
-	finally:
-		# Request was finished; decrease number of active requests
-		# active_prediction_requests.dec()
-		pass
+        return flask_response
+    except requests.exceptions.RequestException as e:
+        return jsonify({"error": f"Could not connect to model-service: {e}"}), 500
 
 
 @app.route('/update-prediction', methods=['POST'])
+@prediction_feedback_counter
+@swag_from({
+    'parameters': [
+        {
+            'name': 'body',
+            'in': 'body',
+            'required': True,
+            'schema': {
+                'id': 'update_input',
+                'type': 'object',
+                'properties': {
+                    'review': {
+                        'type': 'string',
+                        'example': 'The food was delicious!'
+                    },
+                    'sentiment': {
+                        'type': 'string',
+                        'example': 'positive'
+                    }
+                },
+                'required': ['review', 'sentiment']
+            }
+        }
+    ],
+    'responses': {
+        202: {'description': 'Feedback accepted and queued for processing.'},
+        400: {'description': 'Invalid input.'}
+    }
+})
 def update_prediction():
-	"""
-	Updates or confirms a prediction.
-	This request is forwarded to `model-service` for processing.
-	---
-	parameters:
-	  - name: input
-	    in: body
-	    description: JSON with "review" and "label" keys.
-	    required: true
-	responses:
-		200:
-			description: Request was OK.
-		400:
-			description: Input is not in a correct format.
-		500:
-			description: Could not connect to `model-service`.
-	"""
-	try:
-		msg = request.get_json()
-	except Exception:
-		return 'Payload should be a JSON object with "review" and "label" as keys', 400
-
-	if not 'review' in msg:
-		return 'JSON payload should contain "review" key', 400
-	if not 'label' in msg:
-		return 'JSON payload should contain "label" key', 400
-
-	return f'Review label was successfully updated to {msg['label']}'
-
+    """
+    Receives user feedback to correct a prediction and updates metrics
+    """
+    last_feedback_timestamp.set_to_current_time()
+    return jsonify({"status": f"Feedback received. Thanks!"}), 202
 
 @app.route("/version", methods=["GET"])
-def get_lib_version():
-	"""
-	Gets the version from the lib-version package.
-	---
-	responses:
-		200:
-			description: Version (v#.#.#) from lib-version.
-		500:
-			description: Version could not be retrieved.
-	"""
-	try:
-		return version_util.VersionUtil.get_version()
-	except Exception as e:
-		print(e)
-		return "Version not found", 500
+@swag_from({
+    'summary': 'Get all component versions',
+    'description': 'Returns the versions of the app-service, its core lib-version dependency, and the connected model-service.',
+    'responses': {
+        200: {
+            'description': 'A JSON object containing all component versions.',
+            'schema': {
+                'type': 'object',
+                'properties': {
+                    'app_service_version': {
+                        'type': 'string',
+                        'example': '1.2.0'
+                    },
+                    'lib_version': {
+                        'type': 'string',
+                        'example': '0.1.0'
+                    },
+                    'model_service_version': {
+                        'type': 'string',
+                        'example': '0.2.0'
+                    }
+                }
+            }
+        }
+    }
+})
+def get_versions():
+    """
+    Gets the versions of this app-service, its lib-version dependency,
+    and the connected model-service.
+    """
+    app_version = get_current_app_version()
+    library_version = version_util.VersionUtil.get_version()
+    model_version = "unknown"
 
+    try:
+        response = requests.get(f"{MODEL_SERVICE_URL}/version", timeout=3)
+        response.raise_for_status()
+        model_version = response.json().get('version', 'unknown')
+    except requests.exceptions.RequestException:
+        model_version = "not reachable"
+    except Exception:
+        model_version = "error reading version"
 
-app.run(host="0.0.0.0", port=5000)
+    response_data = {
+        "app_service_version": app_version,
+        "lib_version": library_version,
+        "model_service_version": model_version
+    }
+    
+    return jsonify(response_data), 200
+
+# This check is important for running the app with 'flask run'
+if __name__ == '__main__':
+    app.run(host="0.0.0.0", port=5000)
