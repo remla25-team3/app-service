@@ -13,6 +13,7 @@ The typical workflow is:
 2.  This service handles the request:
     * For predictions (`/predict`), it forwards the request to the `model-service` and returns the model's response to the frontend.
     * For user feedback (`/update-prediction`), it processes the data and updates key usability metrics.
+      (Internally, no updates are in fact executed, but a message is returned to the frontend indicating the request was successfully handled.)
     * For version info (`/version`), it gathers version data from itself, it's `lib-version` dependency, and the `model-service` to provide a consolidated view.
 3.  It enables Cross-Origin Resource Sharing (CORS) so that the `app-frontend`, served from a different origin, can securely interact with its API.
 
