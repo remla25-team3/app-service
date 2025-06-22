@@ -1,10 +1,19 @@
-FROM python:3.12.9-slim
+FROM python:3.9-slim
 
-WORKDIR /root
+WORKDIR /app
 
-RUN apt-get update && apt-get install -y git  # Needed to install git packages from requirements.txt
+RUN apt-get update && apt-get install -y git --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
 COPY . .
-RUN pip install -r requirements.txt
 
-ENTRYPOINT ["python"]
-CMD ["app.py"]
+ENV FLASK_ENV=production
+ENV PORT=5000
+
+EXPOSE 5000
+
+CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "app:app"]
