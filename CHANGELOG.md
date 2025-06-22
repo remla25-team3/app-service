@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/remla25-team3/app-service/compare/v1.3.0...v1.3.1) (2025-06-22)
+
+
+### Bug Fixes
+
+* Update README ([#13](https://github.com/remla25-team3/app-service/issues/13)) ([47a38a0](https://github.com/remla25-team3/app-service/commit/47a38a06f18273fb67680b9a52a39c29889d572d))
+
 ## [1.3.0](https://github.com/remla25-team3/app-service/compare/v1.2.0...v1.3.0) (2025-06-22)
 
 
