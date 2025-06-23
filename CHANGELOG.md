@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/remla25-team3/app-service/compare/v1.3.1...v1.4.0) (2025-06-23)
+
+
+### Features
+
+* improved apidocs ([5b41f56](https://github.com/remla25-team3/app-service/commit/5b41f56e77d079b29abaabf1aa0564e17c6456d9))
+
 ## [1.3.1](https://github.com/remla25-team3/app-service/compare/v1.3.0...v1.3.1) (2025-06-22)
 
 
