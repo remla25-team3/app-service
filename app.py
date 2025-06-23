@@ -63,39 +63,52 @@ last_feedback_timestamp = Gauge(
 swagger_template = {
     "swagger": "2.0",
     "info": {
-        "title": "App Service API",
-        "description": "A service that acts as a proxy to the model-service for sentiment analysis of restaurant reviews.",
+        "title": "App Service: REMLA Team 3",
+        "description": "App Service APIs",
         "version": version_util.VersionUtil.get_version()
     }
 }
-swagger = Swagger(app, template=swagger_template)
+swagger_config = {
+    "headers": [],
+    "specs_route": "/app/apidocs",            # was "/apidocs"
+    "specs": [
+        {
+            "endpoint": "apispec_1",
+            "route":    "/app/apispec_1.json",  # was "/apispec_1.json"
+            "rule_filter":  lambda rule: True,
+            "model_filter": lambda tag:  True
+        }
+    ],
+    "static_url_path": "/app/flasgger_static"  # was "/flasgger_static"
+}
+
+swagger = Swagger(app,
+                  template=swagger_template,
+                  config=swagger_config)
+# swagger = Swagger(app, template=swagger_template)
 
 
 # API Endpoints
 @app.route('/predict', methods=['POST'])
 @review_length_histogram 
 @swag_from({
+    'summary': 'Forward review for sentiment prediction',
+    'description': 'Accepts review text, calls model-service /predict, and returns its response.',
+    'tags': ['Prediction'],
     'parameters': [
         {
-            'name': 'body',
-            'in': 'body',
-            'required': True,
+            'in': 'body', 'name': 'body', 'required': True,
             'schema': {
-                'id': 'review_input',
-                'type': 'object',
+                'type': 'object', 'required': ['review'],
                 'properties': {
-                    'review': {
-                        'type': 'string',
-                        'example': 'This place is amazing!'
-                    }
-                },
-                'required': ['review']
+                    'review': { 'type': 'string', 'example': 'Great food!' }
+                }
             }
         }
     ],
     'responses': {
         200: {
-            'description': 'Prediction result from the model-service.',
+            'description': 'Model-service prediction result.',
             'schema': {
                 'type': 'object',
                 'properties': {
@@ -105,8 +118,8 @@ swagger = Swagger(app, template=swagger_template)
                 }
             }
         },
-        400: {'description': 'Invalid input, "review" key is missing.'},
-        500: {'description': 'Error connecting to the model service or internal error.'}
+        400: {'description': 'Missing review key.'},
+        500: {'description': 'Connection or internal error.'}
     }
 })
 def predict():
@@ -131,30 +144,23 @@ def predict():
 @app.route('/update-prediction', methods=['POST'])
 @prediction_feedback_counter
 @swag_from({
+    'summary': 'Submit feedback on prediction',
+    'description': 'Accepts user-corrected sentiment feedback for a review.',
+    'tags': ['Feedback'],
     'parameters': [
         {
-            'name': 'body',
-            'in': 'body',
-            'required': True,
+            'in': 'body', 'name': 'body', 'required': True,
             'schema': {
-                'id': 'update_input',
-                'type': 'object',
+                'type': 'object', 'required': ['review', 'sentiment'],
                 'properties': {
-                    'review': {
-                        'type': 'string',
-                        'example': 'The food was delicious!'
-                    },
-                    'sentiment': {
-                        'type': 'string',
-                        'example': 'positive'
-                    }
-                },
-                'required': ['review', 'sentiment']
+                    'review': { 'type': 'string', 'example': 'Great food!' },
+                    'sentiment': { 'type': 'string', 'example': 'positive' }
+                }
             }
         }
     ],
     'responses': {
-        202: {'description': 'Feedback accepted and queued for processing.'},
+        202: {'description': 'Feedback accepted.'},
         400: {'description': 'Invalid input.'}
     }
 })
@@ -167,26 +173,18 @@ def update_prediction():
 
 @app.route("/version", methods=["GET"])
 @swag_from({
-    'summary': 'Get all component versions',
-    'description': 'Returns the versions of the app-service, its core lib-version dependency, and the connected model-service.',
+    'summary': 'Get component versions',
+    'description': 'Returns versions of the app-service, lib-version, and model-service.',
+    'tags': ['Monitoring'],
     'responses': {
         200: {
-            'description': 'A JSON object containing all component versions.',
+            'description': 'Version details.',
             'schema': {
                 'type': 'object',
                 'properties': {
-                    'app_service_version': {
-                        'type': 'string',
-                        'example': '1.2.0'
-                    },
-                    'lib_version': {
-                        'type': 'string',
-                        'example': '0.1.0'
-                    },
-                    'model_service_version': {
-                        'type': 'string',
-                        'example': '0.2.0'
-                    }
+                    'app_service_version': {'type': 'string'},
+                    'lib_version': {'type': 'string'},
+                    'model_service_version': {'type': 'string'}
                 }
             }
         }
