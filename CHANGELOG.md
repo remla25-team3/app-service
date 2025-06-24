@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.1](https://github.com/remla25-team3/app-service/compare/v1.4.0...v1.4.1) (2025-06-24)
+
+
+### Bug Fixes
+
+* Fix path ([#17](https://github.com/remla25-team3/app-service/issues/17)) ([d4b9839](https://github.com/remla25-team3/app-service/commit/d4b98394122ac5546a213d248885dbd3d3891e79))
+
 ## [1.4.0](https://github.com/remla25-team3/app-service/compare/v1.3.1...v1.4.0) (2025-06-23)
 
 
