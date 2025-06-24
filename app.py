@@ -63,10 +63,11 @@ last_feedback_timestamp = Gauge(
 swagger_template = {
     "swagger": "2.0",
     "info": {
-        "title": "App Service: REMLA Team 3",
+        "title":       "App Service: REMLA Team 3",
         "description": "App Service APIs",
-        "version": version_util.VersionUtil.get_version()
-    }
+        "version":     version_util.VersionUtil.get_version()
+    },
+    "basePath": "/api",
 }
 swagger_config = {
     "headers": [],
