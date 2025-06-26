@@ -59,6 +59,11 @@ last_feedback_timestamp = Gauge(
     'last_feedback_timestamp_seconds', 'The timestamp of the last user feedback submission'
 )
 
+# Business Counter: Number of predictions made
+predictions_made_total = metrics.counter(
+    'predictions_made_total', 'Total number of prediction requests made'
+)
+
 # Swagger API Documentation
 swagger_template = {
     "swagger": "2.0",
@@ -92,6 +97,7 @@ swagger = Swagger(app,
 # API Endpoints
 @app.route('/predict', methods=['POST'])
 @review_length_histogram 
+@predictions_made_total
 @swag_from({
     'summary': 'Forward review for sentiment prediction',
     'description': 'Accepts review text, calls model-service /predict, and returns its response.',
