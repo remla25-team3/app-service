@@ -27,7 +27,11 @@ def get_sentiment_from_response(response):
     except (ValueError, AttributeError):
         # In case of non-JSON response or other errors
         return "error"
-    
+
+def get_frontend_version(default='unknown'):
+    """Gets the frontend version from the 'X-App-Frontend-Version' header."""
+    return request.headers.get('X-App-Frontend-Version', default)
+
 def get_current_app_version():
     """Reads the app version from the .release-please-manifest.json file."""
     try:
@@ -46,22 +50,26 @@ metrics.info('app_info', 'Application info', version=version_util.VersionUtil.ge
 # Usability Histogram: Distribution of review lengths
 review_length_histogram = metrics.histogram(
     'review_length_characters', 'Distribution of the number of characters in reviews',
-    labels={'sentiment': lambda r: get_sentiment_from_response(r)}
+    labels={'sentiment': lambda r: get_sentiment_from_response(r),
+            'frontend_version': lambda: get_frontend_version()}
 )
 # Usability Counter: User feedback on prediction accuracy
 prediction_feedback_counter = metrics.counter(
     'prediction_feedback_total', 'Counts of user feedback on predictions',
     labels={'model_prediction': lambda: request.json.get('model_sentiment'),
-            'user_feedback': lambda: request.json.get('user_sentiment')}
+            'user_feedback': lambda: request.json.get('user_sentiment'),
+            'frontend_version': lambda: get_frontend_version()}
 )
 # Usability Gauge: Timestamp of the last user feedback
 last_feedback_timestamp = Gauge(
-    'last_feedback_timestamp_seconds', 'The timestamp of the last user feedback submission'
+    'last_feedback_timestamp_seconds', 'The timestamp of the last user feedback submission',
+    ['frontend_version']
 )
 
 # Business Counter: Number of predictions made
 predictions_made_total = metrics.counter(
-    'predictions_made_total', 'Total number of prediction requests made'
+    'predictions_made_total', 'Total number of prediction requests made',
+    labels={'frontend_version': lambda: get_frontend_version()}
 )
 
 # Swagger API Documentation
@@ -175,7 +183,8 @@ def update_prediction():
     """
     Receives user feedback to correct a prediction and updates metrics
     """
-    last_feedback_timestamp.set_to_current_time()
+    frontend_version = get_frontend_version()
+    last_feedback_timestamp.labels(frontend_version=frontend_version).set_to_current_time()
     return jsonify({"status": f"Feedback received. Thanks!"}), 202
 
 @app.route("/version", methods=["GET"])
