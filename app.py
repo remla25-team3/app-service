@@ -69,7 +69,7 @@ last_feedback_timestamp = Gauge(
 # Business Counter: Number of predictions made
 predictions_made_total = metrics.counter(
     'predictions_made_total', 'Total number of prediction requests made',
-    labels={'frontend_version': lambda: get_frontend_version()}
+    labels=['frontend_version']
 )
 
 # Swagger API Documentation
@@ -105,7 +105,6 @@ swagger = Swagger(app,
 # API Endpoints
 @app.route('/predict', methods=['POST'])
 @review_length_histogram 
-@predictions_made_total
 @swag_from({
     'summary': 'Forward review for sentiment prediction',
     'description': 'Accepts review text, calls model-service /predict, and returns its response.',
@@ -141,6 +140,9 @@ def predict():
     """
     Fetches the predicted sentiment of a restaurant review from `model-service`.
     """
+    # Manually increment the counter with the frontend_version label
+    predictions_made_total.labels(frontend_version=get_frontend_version()).inc()
+
     try:
         json_data = request.get_json()
         if not json_data or 'review' not in json_data:
