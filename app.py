@@ -77,6 +77,11 @@ predictions_made_total = metrics.counter(
     'predictions_made_total', 'Total number of prediction requests made'
 )
 
+# Business Counter: Number of predictions made
+predictions_made_total = metrics.counter(
+    'predictions_made_total', 'Total number of prediction requests made'
+)
+
 # Swagger API Documentation
 swagger_template = {
     "swagger": "2.0",
