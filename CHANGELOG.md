@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/remla25-team3/app-service/compare/v1.4.1...v1.5.0) (2025-06-26)
+
+
+### Features
+
+* added counter for /prediction ([#19](https://github.com/remla25-team3/app-service/issues/19)) ([0f4654f](https://github.com/remla25-team3/app-service/commit/0f4654f780a2b66e620ff1b9d7f0a6c1e98b5652))
+
 ## [1.4.1](https://github.com/remla25-team3/app-service/compare/v1.4.0...v1.4.1) (2025-06-24)
 
 
