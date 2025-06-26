@@ -50,22 +50,20 @@ metrics.info('app_info', 'Application info', version=version_util.VersionUtil.ge
 # Usability Histogram: Distribution of review lengths
 review_length_histogram = metrics.histogram(
     'review_length_characters', 'Distribution of the number of characters in reviews',
-    labels={'sentiment': lambda r: get_sentiment_from_response(r),
-            'frontend_version': lambda: get_frontend_version()}
+    labels=['sentiment', 'frontend_version']
 )
 # Usability Counter: User feedback on prediction accuracy
 prediction_feedback_counter = metrics.counter(
     'prediction_feedback_total', 'Counts of user feedback on predictions',
-    labels={'model_prediction': lambda: request.json.get('model_sentiment'),
-            'user_feedback': lambda: request.json.get('user_sentiment'),
-            'frontend_version': lambda: get_frontend_version()}
+    labels=['model_prediction',
+            'user_feedback',
+            'frontend_version']
 )
 # Usability Gauge: Timestamp of the last user feedback
 last_feedback_timestamp = Gauge(
     'last_feedback_timestamp_seconds', 'The timestamp of the last user feedback submission',
     ['frontend_version']
 )
-
 # Business Counter: Number of predictions made
 predictions_made_total = metrics.counter(
     'predictions_made_total', 'Total number of prediction requests made',
@@ -104,7 +102,6 @@ swagger = Swagger(app,
 
 # API Endpoints
 @app.route('/predict', methods=['POST'])
-@review_length_histogram 
 @swag_from({
     'summary': 'Forward review for sentiment prediction',
     'description': 'Accepts review text, calls model-service /predict, and returns its response.',
@@ -140,26 +137,37 @@ def predict():
     """
     Fetches the predicted sentiment of a restaurant review from `model-service`.
     """
-    # Manually increment the counter with the frontend_version label
-    predictions_made_total.labels(frontend_version=get_frontend_version()).inc()
+    frontend_version = get_frontend_version()
 
     try:
         json_data = request.get_json()
         if not json_data or 'review' not in json_data:
             return jsonify({"error": "The 'review' key is missing from the request body."}), 400
 
+        review_text = json_data.get('review', '')
+
+        # Manually increment the counter with the frontend_version label
+        predictions_made_total.labels(frontend_version=frontend_version).inc()
+
         response = requests.post(f"{MODEL_SERVICE_URL}/predict", json=json_data, timeout=5)
         response.raise_for_status()
 
-        flask_response = make_response(jsonify(response.json()), response.status_code)
+        # Extract data for metrics
+        model_response_json = response.json()
+        sentiment = model_response_json.get("sentiment", "unknown")
 
-        return flask_response
+        # Manually observe the histogram with review length and correct labels
+        review_length_histogram.labels(
+            sentiment=sentiment,
+            frontend_version=frontend_version
+        ).observe(len(review_text))
+
+        return make_response(jsonify(model_response_json), response.status_code)
     except requests.exceptions.RequestException as e:
         return jsonify({"error": f"Could not connect to model-service: {e}"}), 500
 
 
 @app.route('/update-prediction', methods=['POST'])
-@prediction_feedback_counter
 @swag_from({
     'summary': 'Submit feedback on prediction',
     'description': 'Accepts user-corrected sentiment feedback for a review.',
@@ -168,10 +176,10 @@ def predict():
         {
             'in': 'body', 'name': 'body', 'required': True,
             'schema': {
-                'type': 'object', 'required': ['review', 'sentiment'],
+                'type': 'object', 'required': ['model_sentiment', 'user_sentiment'],
                 'properties': {
-                    'review': { 'type': 'string', 'example': 'Great food!' },
-                    'sentiment': { 'type': 'string', 'example': 'positive' }
+                    'model_sentiment': { 'type': 'string', 'example': 'positive' },
+                    'user_sentiment': { 'type': 'string', 'example': 'negative' }
                 }
             }
         }
@@ -185,7 +193,20 @@ def update_prediction():
     """
     Receives user feedback to correct a prediction and updates metrics
     """
+    json_data = request.get_json()
+    if not json_data:
+        return jsonify({"error": "Invalid JSON"}), 400
+
+    model_prediction = json_data.get('model_sentiment')
+    user_feedback = json_data.get('user_sentiment')
     frontend_version = get_frontend_version()
+
+    # Manually increment the counter with explicit labels
+    prediction_feedback_counter.labels(
+        model_prediction=model_prediction,
+        user_feedback=user_feedback,
+        frontend_version=frontend_version
+    ).inc()
     last_feedback_timestamp.labels(frontend_version=frontend_version).set_to_current_time()
     return jsonify({"status": f"Feedback received. Thanks!"}), 202
 
