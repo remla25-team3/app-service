@@ -25,4 +25,59 @@ jobs:
             token: ${{ steps.app-token.outputs.token }}
             config-file: release-please-config.json
             manifest-file: .release-please-manifest.json
+      
+    prereleases:
+      runs-on: ubuntu-latest
+      needs: release-please
+      if: github.event_name == 'push'
+      steps:
+        - uses: actions/create-github-app-token@v2
+          id: app-token
+          with:
+            app-id: ${{ vars.TEAM_APP_ID }}
+            private-key: ${{ secrets.TEAM_APP_KEY }}
   
+        - uses: actions/checkout@v4
+          with:
+            token: ${{ steps.app-token.outputs.token }}
+    
+        - name: Canary Release and Docker Build
+          run: |
+            # Extract current version
+            CURRENT_VERSION=$(cat .release-please-manifest.json | jq -r '."."')
+            
+            # Parse semantic version
+            if [[ $CURRENT_VERSION =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+              MAJOR=${BASH_REMATCH[1]}
+              MINOR=${BASH_REMATCH[2]}
+              PATCH=${BASH_REMATCH[3]}
+            else
+              echo "Error: Could not parse version $CURRENT_VERSION"
+              exit 1
+            fi
+            
+            NEXT_MINOR=$((MINOR + 1))
+            NEXT_VERSION="$MAJOR.$NEXT_MINOR.0"
+            
+            EXISTING_TAGS=$(git tag -l "${NEXT_VERSION}-canary.*" | sort -V)
+            
+            # Find the highest canary number
+            HIGHEST_CANARY=0
+            for tag in $EXISTING_TAGS; do
+              if [[ $tag =~ ${NEXT_VERSION}-canary\.([0-9]+)$ ]]; then
+                CANARY_NUM=${BASH_REMATCH[1]}
+                if [ $CANARY_NUM -gt $HIGHEST_CANARY ]; then
+                  HIGHEST_CANARY=$CANARY_NUM
+                fi
+              fi
+            done
+            
+            NEXT_CANARY=$((HIGHEST_CANARY + 1))
+            CANARY_TAG="${NEXT_VERSION}-canary.${NEXT_CANARY}"
+            
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$CANARY_TAG" -m "Canary release $CANARY_TAG"
+            git push origin "$CANARY_TAG"
+            
+            echo "Created and pushed tag: $CANARY_TAG"
