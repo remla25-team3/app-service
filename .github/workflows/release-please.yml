@@ -43,9 +43,10 @@ jobs:
     
         - name: Canary Release and Docker Build
           run: |
+            git fetch --tags
             # Extract current version
             CURRENT_VERSION=$(cat .release-please-manifest.json | jq -r '."."')
-            
+          
             # Parse semantic version
             if [[ $CURRENT_VERSION =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
               MAJOR=${BASH_REMATCH[1]}
@@ -56,15 +57,17 @@ jobs:
               exit 1
             fi
             
+            echo "Current version: $CURRENT_VERSION"
+            echo "Major: $MAJOR, Minor: $MINOR, Patch: $PATCH"
             NEXT_MINOR=$((MINOR + 1))
             NEXT_VERSION="$MAJOR.$NEXT_MINOR.0"
             
-            EXISTING_TAGS=$(git tag -l "${NEXT_VERSION}-canary.*" | sort -V)
-            
+            EXISTING_TAGS=$(git tag -l "v${NEXT_VERSION}-canary.*" | sort -V)
+            echo "Existing canary tags: $EXISTING_TAGS"
             # Find the highest canary number
             HIGHEST_CANARY=0
             for tag in $EXISTING_TAGS; do
-              if [[ $tag =~ ${NEXT_VERSION}-canary\.([0-9]+)$ ]]; then
+              if [[ $tag =~ v${NEXT_VERSION}-canary\.([0-9]+)$ ]]; then
                 CANARY_NUM=${BASH_REMATCH[1]}
                 if [ $CANARY_NUM -gt $HIGHEST_CANARY ]; then
                   HIGHEST_CANARY=$CANARY_NUM
@@ -73,8 +76,9 @@ jobs:
             done
             
             NEXT_CANARY=$((HIGHEST_CANARY + 1))
-            CANARY_TAG="${NEXT_VERSION}-canary.${NEXT_CANARY}"
-            
+            CANARY_TAG="v${NEXT_VERSION}-canary.${NEXT_CANARY}"
+            echo "Next canary tag: $CANARY_TAG"
+
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git tag -a "$CANARY_TAG" -m "Canary release $CANARY_TAG"
