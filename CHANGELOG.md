@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.6.0](https://github.com/remla25-team3/app-service/compare/v1.5.0...v1.6.0) (2025-06-26)
+
+
+### Features
+
+* add canary release workflow for versioning and tagging ([843641d](https://github.com/remla25-team3/app-service/commit/843641d0ce5ee332212e91e734b6e29b4252a6c6))
+
+
+### Bug Fixes
+
+* App service fix ([#23](https://github.com/remla25-team3/app-service/issues/23)) ([4d6751b](https://github.com/remla25-team3/app-service/commit/4d6751b2e065c042890f5f890ec01a0ead7c91c0))
+* update canary tag generation to include version prefix ([195355c](https://github.com/remla25-team3/app-service/commit/195355cc2423560388966443a4789f6c758cb165))
+
 ## [1.5.0](https://github.com/remla25-team3/app-service/compare/v1.4.1...v1.5.0) (2025-06-26)
 
 
